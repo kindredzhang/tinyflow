@@ -19,21 +19,21 @@ You can install TinyFlow using `pip` or `uv`.
 ### Using pip
 
 ```bash
-pip install tinyflow
+pip install tinyflow-llm
 ```
 
 ### Using uv (Recommended)
 
 ```bash
-uv add tinyflow
+uv add tinyflow-llm
 ```
 
 ### Installation with Extras
 
 TinyFlow supports optional dependencies for specific features:
 
-- **Local Embeddings**: `pip install "tinyflow[local]"`
-- **Vector Databases**: `pip install "tinyflow[vector]"` (includes ChromaDB and Qdrant)
+- **Local Embeddings**: `pip install "tinyflow-llm[local]"`
+- **Vector Databases**: `pip install "tinyflow-llm[vector]"` (includes ChromaDB and Qdrant)
 
 ## ⚙️ Configuration
 

@@ -1,5 +1,5 @@
 [project]
-name = "tinyflow"
+name = "tinyflow-llm"
 version = "0.1.0"
 description = "A lightweight, extensible, and provider-agnostic Python framework for building LLM agents."
 authors = [
@@ -70,6 +70,9 @@ pythonVersion = "3.12"
 [tool.black]
 line-length = 88
 target-version = ['py312']
+
+[tool.hatch.build.targets.wheel]
+packages = ["tinyflow"]
 
 [dependency-groups]
 dev = [
