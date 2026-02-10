@@ -33,7 +33,7 @@ weather_tool = Tool(
 
 # --- 4. Setup LLM ---
 import os
-deepseek_api_key = os.getenv("DEEPSEEK_API_KEY") or "sk-241c1a257fd1429eb18719dd47ae171f"
+deepseek_api_key = os.getenv("DEEPSEEK_API_KEY")
 llm = LLMFactory.create(
     provider="deepseek", 
     model="deepseek-reasoner",
