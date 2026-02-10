@@ -1,155 +1,99 @@
 # TinyFlow - Agent Development Guide
 
-This document outlines the standards and workflows for AI agents working on the TinyFlow codebase.
-Follow these guidelines strictly to maintain code quality and consistency.
+This document defines the standards and workflows for AI agents working on the TinyFlow codebase. Follow these guidelines strictly to maintain consistency and quality.
 
-## 1. Project Overview
+## 1. Project Overview & Core Tech
 
-TinyFlow is a Python 3.12+ agent framework using `uv` for dependency management.
-It provides a provider-agnostic abstraction over LLMs (OpenAI, Anthropic, Gemini) with a focus on streaming UI components.
+TinyFlow is a Python 3.12+ agent framework using `uv` for dependency management. It provides a provider-agnostic abstraction over LLMs with a focus on streaming UI components.
 
-- **Core Path**: `app/` contains all application logic.
-- **Tests Path**: `tests/` (create if missing).
+- **Core Path**: `tinyflow/` contains all application logic.
+- **Tests Path**: `tests/` (create if missing). Use `pytest` and `pytest-asyncio`.
 - **Key Libraries**:
-  - **Pydantic V2**: For data validation and serialization (use `model_dump()`).
-  - **Asyncio**: Core concurrency model.
-  - **Uv**: Dependency management.
+  - **Pydantic V2**: Mandatory for data validation. Use `model_dump()` and `model_validate()`.
+  - **Asyncio**: Every I/O operation MUST be async. Use `httpx` instead of `requests`.
+  - **Uv**: Use `uv run` for all commands.
 
 ## 2. Build, Lint, & Test Commands
 
-Use `uv` for all environment interactions. Do not use `pip` or `python` directly unless running through `uv`.
+Run these commands from the project root.
 
 ### Dependency Management
-
 ```bash
-uv sync                     # Install/sync all dependencies (creates .venv)
-uv add <package>            # Add a runtime package
-uv add --dev <package>      # Add a development package
+uv sync                     # Sync all dependencies (creates .venv)
+uv add <package>            # Add a runtime dependency
+uv add --dev <package>      # Add a development dependency
 ```
 
 ### Testing (pytest)
-
-Tests must be placed in `tests/`. If the directory is missing, create it.
-
 ```bash
-# Run all tests
-uv run pytest
-
-# Run a specific test file
-uv run pytest tests/test_factories.py
-
-# Run a single test case (CRITICAL for focused debugging)
-uv run pytest tests/test_factories.py::TestLLMFactory::test_create_model_override
-
-# Run with verbose output
-uv run pytest -v -s
+uv run pytest               # Run all tests
+uv run pytest tests/test_factories.py # Run specific file
+uv run pytest tests/test_factories.py::TestLLMFactory::test_create # Single test
+uv run pytest -v -s         # Verbose output with stdout
 ```
 
-### Linting & Formatting
-
-Run these before finishing any task.
-
+### Quality Control
 ```bash
-# Lint code (Ruff) - checks for errors and imports
-uv run ruff check .
-
-# Fix auto-fixable lint errors
-uv run ruff check --fix .
-
-# Format code (Black)
-uv run black .
-
-# Type checking (basedpyright) - Strict typing compliance
-uv run basedpyright
+uv run ruff check .         # Lint (checks imports, errors, naming)
+uv run ruff check --fix .   # Auto-fix linting issues
+uv run black .              # Formatting (88 chars line length)
+uv run basedpyright         # Strict type checking (MANDATORY)
 ```
 
-## 3. Code Style Guidelines
+## 3. Architecture & Patterns
 
-### General
+### 3.1. Factory Pattern
+Providers (LLM, Embeddings, VectorDB) MUST be created via Factories.
+- **Correct**: `llm = LLMFactory.create(provider="openai")`
+- **Incorrect**: Directly instantiating `OpenAIProvider`.
 
-- **Language**: Python 3.12+ features (type aliases `type X = ...` are allowed but `typing` module preferred for compatibility).
-- **Docstrings**: Google-style docstrings for complex functions.
-- **Imports**: Absolute imports from `app`.
-  - Correct: `from app.core.agent import Agent`
-  - Incorrect: `from ..core.agent import Agent`
-  - **Sort Order**: Standard Library > Third Party > Local Application (`app`).
-
-### Naming Conventions
-
-- **Classes**: `PascalCase` (`LLMFactory`, `OpenAIProvider`, `UIMessage`).
-- **Functions/Methods**: `snake_case` (`execute_tool`, `get_context`).
-- **Variables**: `snake_case` (`user_input`, `max_history`).
-- **Constants**: `UPPER_SNAKE_CASE` (`DEFAULT_TIMEOUT`, `MAX_RETRIES`).
-- **Private Members**: `_leading_underscore` (`_execute_tool`, `_get_context_messages`).
-
-### Type Annotations (Strict)
-
-- **Mandatory**: All function signatures (args and return) must be typed.
-- **Generics**: Use `typing.List`, `typing.Dict`, `typing.Optional`, `typing.Union`, `typing.AsyncGenerator`.
-- **Pydantic**: Use Pydantic models for complex data structures.
-  - **V2 Semantics**: Use `model.model_dump()` instead of `model.dict()`.
-  - Use `Field(..., description="...")` for clear schema documentation.
-
-### Error Handling
-
-- **Specific Exceptions**: Catch specific errors (`ValueError`, `json.JSONDecodeError`).
-- **Avoid Bare Except**: Never use `except:` or `except Exception:` without logging/re-raising.
-- **Logging**: Use the shared logger.
+### 3.2. Tool Implementation Guide
+Tools are defined using the `@tool` decorator or `Tool` class.
+- **Docstrings**: MUST use Google-style docstrings. Parameters and descriptions are automatically parsed to create Pydantic schemas for LLMs.
+- **Decorator Usage**:
   ```python
-  import logging
-  logger = logging.getLogger("tinyflow")
-  logger.error(f"Context: {str(e)}")
+  from tinyflow.core.tools import tool
+
+  @tool()
+  async def get_weather(city: str, unit: str = "celsius"):
+      """Get weather info for a city.
+      Args:
+          city: Name of the city.
+          unit: Temperature unit (celsius/fahrenheit).
+      """
+      return f"25° in {city}"
   ```
 
-### Asynchronous Programming
-
-- Use `async def` for all I/O bound operations (LLM calls, database queries).
-- Use `await` properly; avoid `asyncio.run()` inside library code (only in entry points like `main.py`).
-- Use `asyncio.gather()` for parallel execution where appropriate (e.g., executing multiple tool calls).
-
-## 4. Architecture & Patterns
-
-### 4.1. Factory Pattern
-
-Providers (LLM, Embeddings, VectorDB) are instantiated via Factories.
-
-- **Usage**: `LLMFactory.create(provider="openai")`
-- **Anti-Pattern**: `OpenAIProvider(api_key=...)` directly.
-
-### 4.2. UI Message Streaming (Protocol)
-
-The system uses a strict `UIMessage` protocol for frontend rendering.
-
-- **Location**: `app/core/types.py`
-- **Structure**: `UIMessage` contains a list of `UIMessagePart`s.
+### 3.3. UI Message Streaming (Protocol)
+The system uses a strict `UIMessage` protocol in `tinyflow/core/types.py`.
 - **Parts**: `TextUIPart`, `ReasoningUIPart`, `ToolUIPart`, `StepStartUIPart`.
-- **State**: Parts have states (`streaming`, `done`, `input-available`).
-- **Agent Output**: Agents must yield `UIMessage` objects or update existing parts in-place during streaming.
+- **States**: `streaming`, `done`, `input-available`, `output-available`, `output-error`.
+- **Agent Output**: The `Agent.stream()` method yields `UIMessage` objects, updating the `parts` list incrementally.
 
-### 4.3. Configuration
+## 4. Code Style & Typing
 
-- Use `app.config.helpers.get_config_value` for resolving settings.
-- Precedence: Explicit Arguments > Environment Variables > Defaults.
+- **Imports**: ALWAYS use absolute imports (e.g., `from tinyflow.core.agent import Agent`).
+- **Typing**: Use strict type annotations for ALL function signatures. Prefer `typing` module (List, Dict, Optional).
+- **Naming**: `PascalCase` for classes, `snake_case` for functions/variables, `UPPER_SNAKE_CASE` for constants.
+- **Private Members**: Use `_leading_underscore` for internal helper methods.
+- **Error Handling**: Use specific exceptions from `tinyflow.core.exceptions`. NEVER use bare `except:`.
+- **Logging**: Use the shared logger: `logger = logging.getLogger("tinyflow.<module>")`.
 
-## 5. Development Workflow for Agents
+## 5. Development Workflow
 
-1.  **Analyze**: Read the task and identify which `app/` modules are involved.
-2.  **Verify Structure**: Check if `tests/` exists; if not, create it for your new tests.
-3.  **Implement**:
-    - Add new features in `app/`.
-    - Use `pydantic` models for data passing.
-    - Ensure `async/await` is used correctly.
-4.  **Test**:
-    - Create a test file `tests/test_<feature>.py`.
-    - Use `pytest.mark.asyncio` for async tests.
-    - Mock external LLM calls where possible to avoid API costs/latency during testing.
-5.  **Quality Check**:
-    - Run `uv run ruff check .`
-    - Run `uv run basedpyright` to ensure type safety.
-    - Run `uv run pytest` to ensure no regressions.
+1. **Analyze**: Identify the module (providers, core, vector, etc.).
+2. **Setup**: Ensure `.venv` is synced with `uv sync`.
+3. **Implement**: 
+   - Follow Pydantic V2 patterns.
+   - Ensure all I/O is non-blocking.
+   - Maintain UI Streaming Protocol compatibility in `agent.py` or providers.
+4. **Test**: Create `tests/test_<feature>.py` if it doesn't exist. Mock LLM/External API calls using `unittest.mock` or `pytest-mock`.
+5. **Verify**: Run `ruff`, `black`, `basedpyright`, and `pytest` before finishing.
 
-## 6. Common Pitfalls to Avoid
+## 6. Common Pitfalls
 
-- **Blocking Code**: Do not use blocking I/O (e.g., `requests`, `time.sleep`) in async functions. Use `httpx` and `asyncio.sleep`.
-- **Mutable Defaults**: Do not use mutable default arguments (e.g., `def func(items=[])`).
-- **Circular Imports**: Be careful with imports in `app/core`. Use `TYPE_CHECKING` blocks if necessary.
+- **Blocking Calls**: Never use `time.sleep()` or `requests`. Use `asyncio.sleep()` and `httpx`.
+- **Mutable Defaults**: Never use `def func(a=[])`. Use `a: Optional[List] = None`.
+- **Circular Imports**: Use `if TYPE_CHECKING:` blocks for complex type hints in `core/`.
+- **Pydantic V1**: Do not use `model.dict()`. Use `model.model_dump()`.
+- **Missing Rules**: If `.cursorrules` or `.github/copilot-instructions.md` exist, follow them alongside these.

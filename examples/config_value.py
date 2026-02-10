@@ -1,4 +1,4 @@
-from app.config.helpers import get_config_value
+from tinyflow.config.helpers import get_config_value
 
 if __name__ == '__main__':
     # test get value from param_value -> env_key -> settings_field -> default_value

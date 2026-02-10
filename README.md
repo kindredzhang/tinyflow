@@ -14,33 +14,26 @@
 
 ## 📦 Installation
 
-TinyFlow uses [uv](https://github.com/astral-sh/uv) for fast and reliable dependency management.
+You can install TinyFlow using `pip` or `uv`.
 
-### Prerequisites
+### Using pip
 
-- Python >= 3.12
-- `uv` package manager
+```bash
+pip install tinyflow
+```
 
-### Setup
+### Using uv (Recommended)
 
-1.  **Clone the repository:**
+```bash
+uv add tinyflow
+```
 
-    ```bash
-    git clone https://github.com/your-username/tinyflow.git
-    cd tinyflow
-    ```
+### Installation with Extras
 
-2.  **Install dependencies:**
+TinyFlow supports optional dependencies for specific features:
 
-    ```bash
-    uv sync
-    ```
-
-3.  **Configure environment:**
-    Copy the example environment file and update it with your API keys.
-    ```bash
-    cp .env.example .env
-    ```
+- **Local Embeddings**: `pip install "tinyflow[local]"`
+- **Vector Databases**: `pip install "tinyflow[vector]"` (includes ChromaDB and Qdrant)
 
 ## ⚙️ Configuration
 
@@ -74,8 +67,8 @@ Use the `LLMFactory` to create a provider instance. It automatically handles con
 
 ```python
 import asyncio
-from app.providers.base.factory import LLMFactory
-from app.core.types import Message
+from tinyflow.providers.base.factory import LLMFactory
+from tinyflow.core.types import Message
 
 async def main():
     # Automatically loads config from env vars
@@ -102,9 +95,9 @@ Create an `Agent` equipped with custom tools.
 
 ```python
 import asyncio
-from app.core.agent import Agent
-from app.providers.base.factory import LLMFactory
-from app.core.tools import tool
+from tinyflow.core.agent import Agent
+from tinyflow.providers.base.factory import LLMFactory
+from tinyflow.core.tools import tool
 
 # Define a tool
 @tool
@@ -137,9 +130,9 @@ if __name__ == "__main__":
 Integrate RAG (Retrieval-Augmented Generation) capabilities.
 
 ```python
-from app.vector.factory import VectorDBFactory
-from app.embeddings.factory import EmbeddingFactory
-from app.memory.vector import VectorMemory
+from tinyflow.vector.factory import VectorDBFactory
+from tinyflow.embeddings.factory import EmbeddingFactory
+from tinyflow.memory.vector import VectorMemory
 
 # Initialize components
 embedding_model = EmbeddingFactory.create()
@@ -163,7 +156,7 @@ agent = Agent(
 
 ```
 tinyflow/
-├── app/
+├── tinyflow/
 │   ├── config/       # Configuration and helper utilities
 │   ├── core/         # Core abstractions (Agent, Tools, Types)
 │   ├── providers/    # LLM Provider implementations (OpenAI, Anthropic, Gemini)

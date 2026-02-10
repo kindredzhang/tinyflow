@@ -5,10 +5,10 @@ from typing import Any, List
 
 from pydantic import BaseModel, Field
 
-from app.core.agent import Agent
-from app.core.tools import Tool
-from app.core.types import UIMessage, TextUIPart, ToolUIPart, ReasoningUIPart
-from app.providers.base.factory import LLMFactory
+from tinyflow.core.agent import Agent
+from tinyflow.core.tools import Tool
+from tinyflow.core.types import UIMessage, TextUIPart, ToolUIPart, ReasoningUIPart
+from tinyflow.providers.base.factory import LLMFactory
 
 # Configure logging
 logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -52,7 +52,7 @@ tool_agent = Agent(
     tools=[weather_tool],
 )
 
-from app.core.protocol import to_json_stream
+from tinyflow.core.protocol import to_json_stream
 
 # --- 6. Helper for Stream Printing ---
 async def print_stream(generator):

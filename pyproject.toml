@@ -1,9 +1,21 @@
 [project]
 name = "tinyflow"
 version = "0.1.0"
-description = "Add your description here"
+description = "A lightweight, extensible, and provider-agnostic Python framework for building LLM agents."
+authors = [
+    { name = "Your Name", email = "your.email@example.com" }
+]
+license = { text = "MIT" }
 readme = "README.md"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.12"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Intended Audience :: Developers",
+]
 dependencies = [
     "anthropic>=0.78.0",
     "google-genai>=1.62.0",
@@ -37,6 +49,11 @@ dev = [
     "pytest-asyncio>=1.3.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/your-username/tinyflow"
+Repository = "https://github.com/your-username/tinyflow"
+Issues = "https://github.com/your-username/tinyflow/issues"
+
 [tool.ruff]
 line-length = 98
 
@@ -45,17 +62,21 @@ select = ["E", "F", "B", "I", "N"]
 ignore = []
 
 [tool.pyright]
-include = ["app"]
+include = ["tinyflow"]
 exclude = ["**/node_modules", "**/__pycache__", ".venv"]
 typeCheckingMode = "basic"
-pythonVersion = "3.10"
+pythonVersion = "3.12"
 
 [tool.black]
 line-length = 88
-target-version = ['py310']
+target-version = ['py312']
 
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
     "pytest-asyncio>=1.3.0",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
