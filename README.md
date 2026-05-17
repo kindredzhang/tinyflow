@@ -1,199 +1,205 @@
 # TinyFlow
 
-**TinyFlow** is a lightweight, extensible, and provider-agnostic Python framework for building LLM agents. It provides a clean abstraction layer over major LLM providers (OpenAI, Anthropic, Gemini), embedding models, and vector databases, enabling you to build complex agentic workflows with ease.
+<!-- markdownlint-disable-next-line -->
+![License](https://img.shields.io/badge/License-MIT-blue.svg)
+![Python](https://img.shields.io/badge/Python-%3E%3D3.12-3776AB?logo=python&logoColor=white)
+![PyPI](https://img.shields.io/badge/PyPI-tinyflow--llm-1E40AF?logo=pypi)
 
-## 🚀 Key Features
+A lightweight, extensible Python framework for building LLM agents. Designed for developers who want a clean abstraction layer over major LLM providers, with first-class support for tools, memory, RAG, and streaming UX.
 
-- **Provider Agnostic**: Switch seamlessly between OpenAI, Anthropic, and Google Gemini models using a unified `LLMFactory`.
-- **Agentic Workflow**: Built-in "Thinking -> Acting -> Observing" loop for autonomous task execution.
-- **Tool Support**: Easy-to-use `@tool` decorator to give your agents capabilities (web search, code execution, etc.).
-- **Memory & RAG**: Integrated Vector Database support (ChromaDB, Qdrant) and Embedding abstraction (OpenAI, SentenceTransformers).
-- **Unified Configuration**: flexible configuration system supporting parameters, environment variables, and settings files with clear precedence.
-- **Streaming UI**: Rich streaming support for building interactive chat interfaces, including reasoning steps and tool execution visibility.
-- **Modern Stack**: Built with Python 3.12+, Pydantic, Asyncio, and managed with `uv`.
+## What it solves
 
-## 📦 Installation
+TinyFlow gives you the building blocks for agentic workflows without locking you into a specific provider or vector store:
 
-You can install TinyFlow using `pip` or `uv`.
+- **Provider agnostic** — switch between OpenAI, Anthropic, and Google Gemini by changing one line of config
+- **Clean agent primitives** — `Thinking → Acting → Observing` loop, exposed through a minimal API
+- **Tool authoring as a decorator** — `@tool` turns any async function into a tool the agent can call
+- **Streaming by default** — structured JSON streaming so you can build real-time UIs with reasoning step visibility
+- **Memory & RAG** — plug in ChromaDB or Qdrant with a few lines; embed with OpenAI or locally
 
-### Using pip
+## Quick Start
+
+### Installation
 
 ```bash
+# pip
 pip install tinyflow-llm
-```
 
-### Using uv (Recommended)
-
-```bash
+# uv (recommended)
 uv add tinyflow-llm
+
+# Extras
+pip install "tinyflow-llm[local]"       # sentence-transformers embeddings
+pip install "tinyflow-llm[vector]"      # ChromaDB + Qdrant
 ```
 
-### Installation with Extras
+### A complete agent in 30 lines
 
-TinyFlow supports optional dependencies for specific features:
-
-- **Local Embeddings**: `pip install "tinyflow-llm[local]"`
-- **Vector Databases**: `pip install "tinyflow-llm[vector]"` (includes ChromaDB and Qdrant)
-
-## ⚙️ Configuration
-
-TinyFlow uses a unified configuration system. You can configure providers via:
-
-1.  **Explicit Parameters** (passed to Factory `create` methods) - _Highest Priority_
-2.  **Environment Variables** - _Medium Priority_
-3.  **Settings / Defaults** - _Lowest Priority_
-
-### Common Environment Variables
-
-| Category       | Variable             | Description                                      |
-| -------------- | -------------------- | ------------------------------------------------ |
-| **LLM**        | `LLM_PROVIDER`       | `openai`, `anthropic`, or `gemini`               |
-|                | `LLM_API_KEY`        | API Key for the selected provider                |
-|                | `LLM_MODEL`          | Model name (e.g., `gpt-4o`, `claude-3-5-sonnet`) |
-|                | `LLM_BASE_URL`       | Optional custom base URL (e.g., for proxies)     |
-| **Embeddings** | `EMBEDDING_PROVIDER` | `openai`, `local`, or `sentence-transformers`    |
-|                | `EMBEDDING_API_KEY`  | API Key for embedding provider                   |
-|                | `EMBEDDING_MODEL`    | Model name (e.g., `text-embedding-3-small`)      |
-| **Vector DB**  | `VECTOR_DB_PROVIDER` | `chroma` or `qdrant`                             |
-|                | `VECTOR_DB_PATH`     | Path for local ChromaDB persistence              |
-|                | `VECTOR_DB_URL`      | URL for remote Vector DB (e.g., Qdrant Cloud)    |
-|                | `VECTOR_DB_API_KEY`  | API Key for remote Vector DB                     |
-
-## 💡 Usage
-
-### 1. Basic LLM Usage
-
-Use the `LLMFactory` to create a provider instance. It automatically handles configuration.
+This is the canonical example from `examples/basic_chat.py`. It defines a tool, wires it to an agent, and runs a streaming conversation:
 
 ```python
 import asyncio
-from tinyflow.providers.base.factory import LLMFactory
-from tinyflow.core.types import Message
+from pydantic import BaseModel, Field
 
-async def main():
-    # Automatically loads config from env vars
-    llm = LLMFactory.create()
-
-    # Or specify explicitly
-    # llm = LLMFactory.create(provider="anthropic", model="claude-3-opus-20240229")
-
-    messages = [
-        Message(role="system", content="You are a helpful assistant."),
-        Message(role="user", content="Explain quantum computing in one sentence.")
-    ]
-
-    response = await llm.generate(messages)
-    print(response.content)
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-### 2. Building an Agent with Tools
-
-Create an `Agent` equipped with custom tools.
-
-```python
-import asyncio
 from tinyflow.core.agent import Agent
+from tinyflow.core.tools import Tool
+from tinyflow.core.protocol import to_json_stream
 from tinyflow.providers.base.factory import LLMFactory
-from tinyflow.core.tools import tool
 
-# Define a tool
-@tool
-def get_weather(location: str, unit: str = "celsius") -> str:
+
+# 1. Define the tool's input schema
+class WeatherInput(BaseModel):
+    location: str = Field(description="City and state, e.g. San Francisco, CA")
+    unit: str = Field(default="celsius", description="Temperature unit")
+
+
+# 2. Implement the tool
+async def get_weather(args: WeatherInput) -> str:
     """Get the current weather for a location."""
-    # In a real app, call a weather API here
-    return f"The weather in {location} is 25°{unit.upper()} and sunny."
+    return f"The weather in {args.location} is 25°C and sunny."
 
+
+# 3. Register the tool
+weather_tool = Tool(
+    name="get_weather",
+    description="Get weather information for a specific location.",
+    parameters=WeatherInput,
+    execute=get_weather,
+)
+
+# 4. Create agent
+llm = LLMFactory.create(provider="deepseek", model="deepseek-chat")
+agent = Agent(
+    llm=llm,
+    system_prompt="You are a helpful assistant. Use tools when necessary.",
+    tools=[weather_tool],
+)
+
+
+# 5. Stream a conversation
 async def main():
-    # 1. Initialize LLM
-    llm = LLMFactory.create()
-
-    # 2. Create Agent with tools
-    agent = Agent(
-        llm=llm,
-        tools=[get_weather],
-        system_prompt="You are a helpful assistant with access to weather tools."
-    )
-
-    # 3. Run Agent
-    response = await agent.run("What's the weather like in Paris?")
+    # Non-streaming
+    response = await agent.run("What's the weather in Tokyo?")
     print(response)
 
+    # Streaming (for real-time UIs)
+    async for delta in to_json_stream(agent.stream("What's the weather in Paris?")):
+        print(f"data: {delta}", end="", flush=True)
+
+
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-### 3. Using Vector Memory
+## Configuration
 
-Integrate RAG (Retrieval-Augmented Generation) capabilities.
+TinyFlow resolves config from three sources, in priority order:
+
+1. **Explicit parameters** — passed to `LLMFactory.create()`
+2. **Environment variables** — `LLM_PROVIDER`, `LLM_API_KEY`, `LLM_MODEL`, etc.
+3. **Settings / defaults** — fallbacks when the above are not set
+
+```bash
+# .env
+LLM_PROVIDER=deepseek
+LLM_API_KEY=sk-...
+LLM_MODEL=deepseek-chat
+```
+
+| Variable | Description |
+|---|---|
+| `LLM_PROVIDER` | `openai`, `anthropic`, or `gemini` |
+| `LLM_API_KEY` | API key for your provider |
+| `LLM_MODEL` | Model name, e.g. `gpt-4o`, `claude-3-5-sonnet` |
+| `LLM_BASE_URL` | Optional proxy base URL |
+| `EMBEDDING_PROVIDER` | `openai`, `local`, or `sentence-transformers` |
+| `VECTOR_DB_PROVIDER` | `chroma` or `qdrant` |
+
+## Key Features
+
+### Provider Agnostic
+
+```python
+# Switch provider by changing one argument
+llm = LLMFactory.create(provider="anthropic", model="claude-3-5-sonnet")
+```
+
+### Tool Support
+
+The `@tool` decorator wraps any async function. Pydantic validates inputs automatically:
+
+```python
+from tinyflow.core.tools import tool
+
+@tool
+def web_search(query: str, num_results: int = 5) -> str:
+    """Search the web for information."""
+    ...
+
+agent = Agent(llm=llm, tools=[web_search])
+```
+
+### Memory & RAG
 
 ```python
 from tinyflow.vector.factory import VectorDBFactory
 from tinyflow.embeddings.factory import EmbeddingFactory
 from tinyflow.memory.vector import VectorMemory
 
-# Initialize components
-embedding_model = EmbeddingFactory.create()
+embedding = EmbeddingFactory.create()
 vector_db = VectorDBFactory.create()
+memory = VectorMemory(vector_db=vector_db, embedding_model=embedding)
 
-# Create memory interface
-memory = VectorMemory(
-    vector_db=vector_db,
-    embedding_model=embedding_model
-)
-
-# Use in Agent
-agent = Agent(
-    llm=llm,
-    memory=memory,
-    system_prompt="Use your memory to answer questions."
-)
+agent = Agent(llm=llm, memory=memory)
 ```
 
-## 🏗️ Project Structure
+### Streaming UI Support
+
+`to_json_stream()` emits structured JSON deltas that frontend clients can consume to show real-time reasoning steps and tool execution:
+
+```python
+async for delta in to_json_stream(agent.stream(user_input)):
+    # delta: {"role":"assistant","part":{"type":"text","text":"..."}}
+    #        {"role":"assistant","part":{"type":"tool_call","tool_name":"get_weather",...}}
+    #        {"role":"assistant","part":{"type":"tool_result","tool_name":"get_weather","output":"..."}}
+    print(delta)
+```
+
+## Project Structure
 
 ```
 tinyflow/
 ├── tinyflow/
-│   ├── config/       # Configuration and helper utilities
-│   ├── core/         # Core abstractions (Agent, Tools, Types)
-│   ├── providers/    # LLM Provider implementations (OpenAI, Anthropic, Gemini)
-│   ├── embeddings/   # Embedding models (OpenAI, Local)
-│   ├── vector/       # Vector Database adapters (Chroma, Qdrant)
-│   └── memory/       # Memory implementations
-├── tests/            # Unit and integration tests
-├── main.py           # Entry point example
-└── pyproject.toml    # Project dependencies and config
+│   ├── config/       # Unified configuration system
+│   ├── core/         # Agent, Tool, Types, protocol
+│   ├── providers/    # OpenAI, Anthropic, Gemini, DeepSeek
+│   ├── embeddings/   # OpenAI + local (sentence-transformers)
+│   ├── vector/       # ChromaDB, Qdrant adapters
+│   └── memory/       # VectorMemory, session memory
+├── examples/
+│   ├── basic_chat.py       # Tool use + streaming (start here)
+│   └── config_value.py     # Configuration resolution demo
+└── pyproject.toml
 ```
 
-## 🧪 Development
-
-### Running Tests
-
-TinyFlow uses `pytest` for testing.
+## Development
 
 ```bash
-# Run all tests
+uv sync
+
+# Run tests
 uv run pytest
 
-# Run specific test file
-uv run pytest tests/test_factories.py -v
-```
-
-### Code Style
-
-The project uses `ruff` for linting and formatting.
-
-```bash
 # Lint
 uv run ruff check .
 
 # Format
 uv run ruff format .
+
+# Type check
+uv run pyright
 ```
 
-## 📄 License
+## License
 
-[MIT License](LICENSE)
+[MIT](LICENSE)
